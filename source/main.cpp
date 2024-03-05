@@ -6,12 +6,12 @@
 #include "Filesystem.h"
 #include "utlbuffer.h"
 #include "util.h"
-  
+
 static SourceSDK::FactoryLoader engine_loader("engine");
 static IGameEventManager2* eventmanager = nullptr;
 IFileSystem* g_FileSystem = nullptr;
-
 KeyValues* pGameEvents = nullptr;
+
 void PushEvent(IGameEvent* event)
 {
 	KeyValues* kv_event = pGameEvents->FindKey(event->GetName());
@@ -20,6 +20,7 @@ void PushEvent(IGameEvent* event)
 		Msg("Invalid Event? (%s)\n", event->GetName());
 		return;
 	}
+
 	KeyValues* subkey = kv_event->GetFirstSubKey();
 	while (subkey)
 	{
@@ -37,14 +38,18 @@ void PushEvent(IGameEvent* event)
 			GlobalLUA->PushNil();
 			Msg("Invalid Type?!? (%s -> %s)\n", event->GetName(), subkey->GetName());
 		}
+
 		GlobalLUA->SetField(-2, subkey->GetName());
+
 		subkey = subkey->GetNextKey();
 	}
 }
+
 class CustomGameEventListener : public IGameEventListener2
 {
 public:
 	CustomGameEventListener() = default;
+
 	void FireGameEvent(IGameEvent* event)
 	{
 		GlobalLUA->PushSpecial(GarrysMod::Lua::SPECIAL_GLOB);
@@ -53,6 +58,7 @@ public:
 		GlobalLUA->PushString(event->GetName());
 		GlobalLUA->CreateTable();
 		PushEvent(event);
+
 		GlobalLUA->Call(2, 0);
 		GlobalLUA->Pop(2);
 	}
@@ -63,14 +69,17 @@ LUA_FUNCTION_STATIC(Listen) {
 	if (!eventmanager->FindListener(EventListener, name)) {
 		eventmanager->AddListener(EventListener, name, false);
 	}
+
 	KeyValues* kv_event = pGameEvents->FindKey(name);
 	if (!kv_event)
 	{
 		Msg("Invalid Event? (%s)\n", name);
 		return 0;
 	}
+
 	return 0;
 }
+
 const char* unlisted_events = R"V0G0N(
 "otherevents"
 {
@@ -128,17 +137,22 @@ GMOD_MODULE_OPEN()
 	eventmanager = (IGameEventManager2*)engine_loader.GetFactory()(INTERFACEVERSION_GAMEEVENTSMANAGER2, nullptr);
 	if (eventmanager == nullptr)
 		LUA->ThrowError("unable to initialize IGameEventManager2");
+
 	g_FileSystem = InterfacePointers::FileSystem();
+
 	pGameEvents = new KeyValues("resource/serverevents.res");
+
 	CUtlBuffer buf;
 	if (!g_FileSystem->ReadFile("resource/serverevents.res", "GAME", buf))
 		LUA->ThrowError("unable to read resource/serverevents.res!");
+
 	pGameEvents = new KeyValues("");
 	if (!pGameEvents->LoadFromBuffer("resource/serverevents.res", buf.String()))
 	{
 		pGameEvents->deleteThis();
 		return 0;
 	}
+
 	CUtlBuffer modbuf;
 	if (!g_FileSystem->ReadFile("resource/modevents.res", "GAME", modbuf))
 		LUA->ThrowError("unable to read resource/modevents.res!");
@@ -150,6 +164,7 @@ GMOD_MODULE_OPEN()
 		return 0;
 	}
 	pGameEvents->RecursiveMergeKeyValues(pModGameEvents);
+
 	CUtlBuffer otherbuf;
 	otherbuf.PutString(unlisted_events);
 
@@ -157,15 +172,18 @@ GMOD_MODULE_OPEN()
 	if (!pOtherGameEvents->LoadFromBuffer("otherevents", otherbuf.String()))
 	{
 		pOtherGameEvents->deleteThis();
-		return 0;  
+		return 0;
 	}
 	pGameEvents->RecursiveMergeKeyValues(pOtherGameEvents);
+
 	Start_Table();
 		Add_Func(Listen, "Listen");
 	Finish_Table("gameevent");
 
+	LuaPrint("[GameEventManager] Added gameevent.Listen");
 	return 0;
 }
+
 GMOD_MODULE_CLOSE()
 {
 	return 0;
