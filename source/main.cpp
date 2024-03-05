@@ -2,16 +2,20 @@
 #include <GarrysMod/FactoryLoader.hpp>
 #include <GarrysMod/Lua/Interface.h>
 #include "GameEventListener.h"
+#ifdef ARCHITECTURE_X86
 #include "KeyValues.h"
-#include "Filesystem.h"
+#else
+#include "keyvalues.h"
+#endif
+#include "filesystem.h"
 #include "utlbuffer.h"
 #include "util.h"
 
 static SourceSDK::FactoryLoader engine_loader("engine");
 static IGameEventManager2* eventmanager = nullptr;
 IFileSystem* g_FileSystem = nullptr;
+//KeyValues* pModGameEvents = nullptr;
 KeyValues* pGameEvents = nullptr;
-
 void PushEvent(IGameEvent* event)
 {
 	KeyValues* kv_event = pGameEvents->FindKey(event->GetName());
@@ -63,7 +67,9 @@ public:
 		GlobalLUA->Pop(2);
 	}
 };
+
 static CustomGameEventListener* EventListener = new CustomGameEventListener;
+
 LUA_FUNCTION_STATIC(Listen) {
 	const char* name = LUA->CheckString(1);
 	if (!eventmanager->FindListener(EventListener, name)) {
@@ -89,11 +95,13 @@ const char* unlisted_events = R"V0G0N(
 		"userid"	"byte"
 		"material"	"long"
 	}
+
 	"break_prop"
 	{
 		"entindex"	"short"
 		"userid"	"byte"
 	}
+
 	"entity_killed"
 	{
 		"entindex_inflictor"	"short"
@@ -101,30 +109,36 @@ const char* unlisted_events = R"V0G0N(
 		"damagebits"			"short"
 		"entindex_killed"		"byte"
 	}
+
 	"flare_ignite_npc"
 	{
 		"entindex"	"short"
 	}
+
 	"player_changename"
 	{
 		"userid"	"byte"
 		"oldname"	"string"
 		"newname"	"string"
 	}
+
 	"player_hurt"
 	{
 		"userid"	"byte"
 		"health"	"short"
 		"attacker"	"byte"
 	}
+
 	"player_spawn"
 	{
 		"userid"	"byte"
 	}
+
 	"ragdoll_dissolved"
 	{
 		"entindex"	"short"
 	}
+
 	"game_newmap"
 	{
 		"mapname"	"string"
@@ -147,7 +161,7 @@ GMOD_MODULE_OPEN()
 		LUA->ThrowError("unable to read resource/serverevents.res!");
 
 	pGameEvents = new KeyValues("");
-	if (!pGameEvents->LoadFromBuffer("resource/serverevents.res", buf.String()))
+	if (!pGameEvents->LoadFromBuffer("resource/serverevents.res", buf.String())
 	{
 		pGameEvents->deleteThis();
 		return 0;
@@ -158,33 +172,45 @@ GMOD_MODULE_OPEN()
 		LUA->ThrowError("unable to read resource/modevents.res!");
 
 	KeyValues* pModGameEvents = new KeyValues("");
-	if (!pModGameEvents->LoadFromBuffer("resource/modevents.res", modbuf.String()))
+	if (!pModGameEvents->LoadFromBuffer("resource/modevents.res", modbuf))
 	{
 		pModGameEvents->deleteThis();
 		return 0;
 	}
+#ifdef ARCHITECTURE_X86
 	pGameEvents->RecursiveMergeKeyValues(pModGameEvents);
+#else
+	pGameEvents->MergeFrom(pModGameEvents);
+#endif
 
 	CUtlBuffer otherbuf;
 	otherbuf.PutString(unlisted_events);
 
 	KeyValues* pOtherGameEvents = new KeyValues("");
-	if (!pOtherGameEvents->LoadFromBuffer("otherevents", otherbuf.String()))
+	if (!pOtherGameEvents->LoadFromBuffer("otherevents", otherbuf))
 	{
 		pOtherGameEvents->deleteThis();
 		return 0;
 	}
+#ifdef ARCHITECTURE_X86
 	pGameEvents->RecursiveMergeKeyValues(pOtherGameEvents);
+#else
+	pGameEvents->MergeFrom(pOtherGameEvents);
+#endif
 
 	Start_Table();
 		Add_Func(Listen, "Listen");
 	Finish_Table("gameevent");
 
 	LuaPrint("[GameEventManager] Added gameevent.Listen");
+
 	return 0;
 }
 
 GMOD_MODULE_CLOSE()
 {
+	//delete pGameEvents;
+	//delete pModGameEvents;
+
 	return 0;
 }
