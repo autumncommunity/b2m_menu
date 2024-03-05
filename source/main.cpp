@@ -161,7 +161,7 @@ GMOD_MODULE_OPEN()
 		LUA->ThrowError("unable to read resource/serverevents.res!");
 
 	pGameEvents = new KeyValues("");
-	if (!pGameEvents->LoadFromBuffer("resource/serverevents.res", buf.String())
+	if (!pGameEvents->LoadFromBuffer("resource/serverevents.res", buf.String()))
 	{
 		pGameEvents->deleteThis();
 		return 0;
